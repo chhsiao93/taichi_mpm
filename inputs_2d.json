@@ -1,8 +1,8 @@
 {
     "save_path": "adam/train",
     "id_range": [
-        100,
-        102
+        0,
+        1000
     ],
     "domain_size": 1.0,
     "friction_angle": [25,50],
