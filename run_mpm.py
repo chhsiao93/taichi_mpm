@@ -221,6 +221,7 @@ def run_collision(i, inputs):
 
         if "output_format" in inputs:  # Read from input files
             if "friction_angle" in inputs["output_format"]["material_feature"]:
+                print('including friction angle as material feature')
                 # make friction angle feature. We normalize friction angle by tan(phi), where phi is friction angle in deg
                 friction_feature = np.full(
                     n_soil_particles, np.tan(inputs["friction_angle"] * np.pi / 180).astype(np.float32))
@@ -247,13 +248,15 @@ def run_collision(i, inputs):
         trajectories[f"trajectory{i}"] = (
             positions[::downsample_rate],  # position sequence (timesteps, particles, dims)
             particle_types.astype(np.int32),  # particle type (particles, )
-            material_feature)  # particle type (particles, n_features)
+            material_feature,  # particle type (particles, n_features)
+            mpm.friction_angle)
 
     # If material_feature is False
     else:
         trajectories[f"trajectory{i}"] = (
             positions[::downsample_rate],  # position sequence (timesteps, particles, dims)
-            particle_types.astype(np.int32))  # particle type (particles, )
+            particle_types.astype(np.int32),  # particle type (particles, )
+            mpm.friction_angle)
 
     # Save npz
     np.savez_compressed(f"{save_path}/trajectory{i}", **trajectories)
@@ -275,7 +278,8 @@ def run_collision(i, inputs):
         "cubes": cubes,
         "velocity_for_cubes": velocity_for_cubes,
         "obstacles": obstacles,
-        "nparticles": int(nparticles)
+        "nparticles": int(nparticles),
+        "friction_angle": mpm.friction_angle
     }
     with open(f"{save_path}/particle_info{i}.json", "w") as outfile:
         json.dump(sim_data, outfile, indent=4)
