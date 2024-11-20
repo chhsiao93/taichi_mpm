@@ -120,6 +120,7 @@ class MPMSolver:
             self.v = ti.Vector.field(self.dim, dtype=ti.f32)
             self.x = ti.Vector.field(self.dim, dtype=ti.f32)
             self.F = ti.Matrix.field(self.dim, self.dim, dtype=ti.f32)
+            self.stress = ti.Matrix.field(self.dim, self.dim, dtype=ti.f32)
 
         self.use_emitter_id = use_emitter_id
         if self.use_emitter_id:
@@ -210,7 +211,7 @@ class MPMSolver:
         # Sand parameters
         if isinstance(input_vars["friction_angle"], list):
             assert len(input_vars["friction_angle"])==2 # check if it include min and max
-            self.friction_angle = np.random.uniform(input_vars["friction_angle"][0],input_vars["friction_angle"][1])
+            self.friction_angle = math.radians(np.random.uniform(input_vars["friction_angle"][0],input_vars["friction_angle"][1]))
         else: # if it's a scalar
             self.friction_angle = math.radians(input_vars["friction_angle"])
         sin_phi = math.sin(self.friction_angle)
@@ -269,10 +270,10 @@ class MPMSolver:
                 self.particle.place(self.emitter_ids)
         else:
             if self.use_emitter_id:
-                self.particle.place(self.x, self.v, self.F, self.material,
+                self.particle.place(self.x, self.v, self.F, self.stress, self.material,
                                 self.color, self.emitter_ids)
             else:
-                self.particle.place(self.x, self.v, self.F, self.material,
+                self.particle.place(self.x, self.v, self.F, self.stress, self.material,
                                 self.color)
             if self.support_plasticity:
                 self.particle.place(self.Jp)
@@ -574,6 +575,7 @@ class MPMSolver:
             self.F[p] = F
 
             stress = (-dt * self.p_vol * 4 * self.inv_dx**2) * stress
+            self.stress[p] = stress
             # TODO: implement g2p2g pmass
             mass = self.p_mass
             if self.material[p] == self.material_water:
@@ -670,7 +672,7 @@ class MPMSolver:
             for I in ti.grouped(grid_v):
                 offset = I * self.dx - ti.Vector(point)
                 n = ti.Vector(normal)
-                if offset.dot(n) < 0:
+                if offset.dot(n) < 0: # the other side of the surface
                     if ti.static(surface == self.surface_sticky):
                         grid_v[I] = ti.Vector.zero(ti.f32, self.dim)
                     else:
@@ -1152,6 +1154,12 @@ class MPMSolver:
                                              color[begin:end])
 
     @ti.kernel
+    def copy_dynamic_mx(self, np_x: ti.types.ndarray(), input_x: ti.template()):
+        for p in self.x:
+            for i in ti.static(range(self.dim)):
+                for j in ti.static(range(self.dim)):
+                    np_x[p, i, j] = input_x[p][i, j]
+    @ti.kernel
     def copy_dynamic_nd(self, np_x: ti.types.ndarray(), input_x: ti.template()):
         for i in self.x:
             for j in ti.static(range(self.dim)):
@@ -1182,6 +1190,8 @@ class MPMSolver:
         self.copy_dynamic_nd(np_x, self.x)
         np_v = np.ndarray((self.n_particles[None], self.dim), dtype=np.float32)
         self.copy_dynamic_nd(np_v, self.v)
+        np_stress = np.ndarray((self.n_particles[None], self.dim, self.dim), dtype=np.float32)
+        self.copy_dynamic_mx(np_stress, self.stress)
         np_material = np.ndarray((self.n_particles[None], ), dtype=np.int32)
         self.copy_dynamic(np_material, self.material)
         np_color = np.ndarray((self.n_particles[None], ), dtype=np.int32)
@@ -1189,6 +1199,7 @@ class MPMSolver:
         particles_data = {
             'position': np_x,
             'velocity': np_v,
+            'stress': np_stress,
             'material': np_material,
             'color': np_color
         }

@@ -168,12 +168,13 @@ def run_collision(i, inputs):
     # run simulation
     print(f"Running simulation {i}/{inputs['id_range'][1]}...")
     positions = []
+    stresses = []
     for frame in tqdm(range(nsteps)):
         mpm.step(mpm_dt)
         colors = np.array([0x068587, 0xED553B, 0xEEEEF0, 0xFFFF00], dtype=np.uint32)
         particles = mpm.particle_info()
         positions.append(particles["position"])
-
+        stresses.append(particles["stress"])
         if is_realtime_vis:
             if ndim == 3:
                 # simple camera transform
@@ -207,7 +208,7 @@ def run_collision(i, inputs):
     else:
         downsample_rate = 1
 
-    trajectories = {}
+    trajectory = {}
 
     # Make particle type feature
     if obstacles is not None:
@@ -244,22 +245,27 @@ def run_collision(i, inputs):
             # make friction angle feature. We normalize friction angle by tan(phi), where phi is friction angle in deg
             material_feature = np.full(
                 n_soil_particles, np.tan(inputs["friction_angle"] * np.pi / 180).astype(np.float32))
-
-        trajectories[f"trajectory{i}"] = (
-            positions[::downsample_rate],  # position sequence (timesteps, particles, dims)
-            particle_types.astype(np.int32),  # particle type (particles, )
-            material_feature,  # particle type (particles, n_features)
-            mpm.friction_angle)
+        trajectory['trajectory'] = i
+        trajectory['positions'] = positions[::downsample_rate] # position sequence (timesteps, particles, dims)
+        trajectory['particle_types'] = particle_types.astype(np.int32) # particle type (particles, )
+        trajectory['material_feature'] = material_feature # material feature (particles, n_features)
+        trajectory['stress'] = np.stack(stresses)[::downsample_rate] # stress sequence (timesteps, particles, dims)
+        trajectory['friction_angle'] = mpm.friction_angle # friction angle
+        trajectory['sim_space'] = sim_space
+        trajectory['dt'] = mpm_dt
 
     # If material_feature is False
     else:
-        trajectories[f"trajectory{i}"] = (
-            positions[::downsample_rate],  # position sequence (timesteps, particles, dims)
-            particle_types.astype(np.int32),  # particle type (particles, )
-            mpm.friction_angle)
+        trajectory['trajectory'] = i
+        trajectory['positions'] = positions[::downsample_rate] # position sequence (timesteps, particles, dims)
+        trajectory['particle_types'] = particle_types.astype(np.int32) # particle type (particles, )
+        trajectory['stress'] = np.stack(stresses)[::downsample_rate] # stress sequence (timesteps, particles, dims)
+        trajectory['friction_angle'] = mpm.friction_angle # friction angle
+        trajectory['sim_space'] = sim_space
+        trajectory['dt'] = mpm_dt
 
     # Save npz
-    np.savez_compressed(f"{save_path}/trajectory{i}", **trajectories)
+    np.savez_compressed(f"{save_path}/trajectory{i}", **trajectory)
     print(f"Trajectory {i} has {positions.shape[1]} particles")
     print(f"Output written to: {save_path}/trajectory{i}")
 
@@ -269,7 +275,7 @@ def run_collision(i, inputs):
             utils.animation_from_npz(path=save_path,
                                      npz_name=f"trajectory{i}",
                                      save_name=f"trajectory{i}",
-                                     boundaries=sim_space,
+                                     boundaries=[[0.0,1.0],[0.0,1.0]],#sim_space,
                                      timestep_stride=5,
                                      follow_taichi_coord=follow_taichi_coord)
 
@@ -279,7 +285,9 @@ def run_collision(i, inputs):
         "velocity_for_cubes": velocity_for_cubes,
         "obstacles": obstacles,
         "nparticles": int(nparticles),
-        "friction_angle": mpm.friction_angle
+        "friction_angle": mpm.friction_angle,
+        "sim_space": sim_space,
+        "dt": mpm_dt,
     }
     with open(f"{save_path}/particle_info{i}.json", "w") as outfile:
         json.dump(sim_data, outfile, indent=4)

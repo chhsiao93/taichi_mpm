@@ -121,20 +121,30 @@ def animation_from_npz(
         boundaries,
         timestep_stride=5,
         colorful=True,
+        color_on=None,
         follow_taichi_coord=False):
 
     data = dict(np.load(f"{path}/{npz_name}.npz", allow_pickle=True))
-    for i, (sim, info) in enumerate(data.items()):
-        positions = info[0]
+    positions = data['positions']
+    # for i, (sim, info) in enumerate(data.items()):
+    #     positions = info['position']
     ndim = positions.shape[-1]
-
     # compute vel magnitude for color bar
     if colorful:
-        initial_vel = np.zeros(positions[0].shape)
-        initial_vel = initial_vel.reshape((1, initial_vel.shape[0], initial_vel.shape[1]))
-        vel = positions[1:] - positions[:-1]
-        vel = np.concatenate((initial_vel, vel))
-        vel_magnitude = np.linalg.norm(vel, axis=-1)
+        if color_on is None: # use velocity
+            print("Using velocity for color")
+            initial_vel = np.zeros(positions[0].shape)
+            initial_vel = initial_vel.reshape((1, initial_vel.shape[0], initial_vel.shape[1]))
+            vel = positions[1:] - positions[:-1]
+            vel = np.concatenate((initial_vel, vel))
+            vel_magnitude = np.linalg.norm(vel, axis=-1)
+        elif color_on == 'stress':
+            print("Using stress data for color")
+            stress_data = data[color_on]
+            assert stress_data.shape[0] == positions.shape[0], "Color data must have the same length as positions"
+            vel_magnitude = np.trace(np.abs(stress_data), axis1=-1, axis2=-2)
+            
+            
 
     if ndim == 2:
         # make animation
@@ -146,7 +156,13 @@ def animation_from_npz(
             ax = fig.add_subplot(111, aspect='equal', autoscale_on=False)
             ax.set_xlim(boundaries[0][0], boundaries[0][1])
             ax.set_ylim(boundaries[1][0], boundaries[1][1])
-            ax.scatter(positions[i][:, 0], positions[i][:, 1], s=1)
+            if colorful:
+                sampled_value = vel_magnitude[i]
+                trj = ax.scatter(positions[i][:, 0], positions[i][:, 1],
+                                 c=sampled_value, cmap='viridis', vmin=vel_magnitude.min(), vmax=vel_magnitude.mean()+1*vel_magnitude.std(), s=1)
+                fig.colorbar(trj)
+            else:
+                ax.scatter(positions[i][:, 0], positions[i][:, 1], s=1)
             ax.grid(True, which='both')
 
     if ndim == 3:
