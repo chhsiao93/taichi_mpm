@@ -51,5 +51,5 @@ template['gen_cube_from_data']['sim_inputs'] = [
 ]
 template['visualization']['is_save_animation'] = True
 # save the new dictionary to a new file
-with open('new_inputs_2d.json', 'w') as f:
+with open('inputs_sand2d_columns.json', 'w') as f:
     json.dump(template, f, indent=4)
