@@ -209,11 +209,10 @@ class MPMSolver:
             2 * (1 + self.nu)), self.E * self.nu / ((1 + self.nu) *
                                                     (1 - 2 * self.nu))
         # Sand parameters
-        if isinstance(input_vars["friction_angle"], list):
-            assert len(input_vars["friction_angle"])==2 # check if it include min and max
-            self.friction_angle = math.radians(np.random.uniform(input_vars["friction_angle"][0],input_vars["friction_angle"][1]))
-        else: # if it's a scalar
-            self.friction_angle = math.radians(input_vars["friction_angle"])
+        # check if the input is not a list
+        assert not isinstance(input_vars["friction_angle"], list)
+
+        self.friction_angle = math.radians(input_vars["friction_angle"])
         sin_phi = math.sin(self.friction_angle)
         self.alpha = math.sqrt(2 / 3) * 2 * sin_phi / (3 - sin_phi)
 

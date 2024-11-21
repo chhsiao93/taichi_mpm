@@ -5,12 +5,14 @@ import os
 import json
 import taichi as ti
 import random
+from copy import deepcopy
 import utils
 from tqdm import tqdm
 from engine.mpm_solver import MPMSolver
 
 
 def run_collision(i, inputs):
+    inputs = deepcopy(inputs)
     # inputs about general simulation information
     domain_size = inputs["domain_size"]
     sim_space = inputs["sim_space"]
@@ -26,7 +28,9 @@ def run_collision(i, inputs):
     # visualization & simulation inputs
     is_realtime_vis = inputs["visualization"]["is_realtime_vis"]
     save_path = inputs["save_path"]
-
+    if isinstance(inputs['friction_angle'], list):
+        friction_angle = np.random.uniform(inputs["friction_angle"][0],inputs["friction_angle"][1])
+        inputs["friction_angle"] = friction_angle
     # init visualizer
     if is_realtime_vis:
         if ndim == 3:
@@ -250,7 +254,7 @@ def run_collision(i, inputs):
         trajectory['particle_types'] = particle_types.astype(np.int32) # particle type (particles, )
         trajectory['material_feature'] = material_feature # material feature (particles, n_features)
         trajectory['stress'] = np.stack(stresses)[::downsample_rate] # stress sequence (timesteps, particles, dims)
-        trajectory['friction_angle'] = mpm.friction_angle # friction angle
+        trajectory['friction_angle'] = inputs["friction_angle"] # friction angle
         trajectory['sim_space'] = sim_space
         trajectory['dt'] = mpm_dt
 
@@ -260,7 +264,7 @@ def run_collision(i, inputs):
         trajectory['positions'] = positions[::downsample_rate] # position sequence (timesteps, particles, dims)
         trajectory['particle_types'] = particle_types.astype(np.int32) # particle type (particles, )
         trajectory['stress'] = np.stack(stresses)[::downsample_rate] # stress sequence (timesteps, particles, dims)
-        trajectory['friction_angle'] = mpm.friction_angle # friction angle
+        trajectory['friction_angle'] = inputs["friction_angle"] # friction angle
         trajectory['sim_space'] = sim_space
         trajectory['dt'] = mpm_dt
 
@@ -285,7 +289,7 @@ def run_collision(i, inputs):
         "velocity_for_cubes": velocity_for_cubes,
         "obstacles": obstacles,
         "nparticles": int(nparticles),
-        "friction_angle": mpm.friction_angle,
+        "friction_angle": inputs["friction_angle"],
         "sim_space": sim_space,
         "dt": mpm_dt,
     }
