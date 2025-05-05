@@ -122,6 +122,7 @@ def animation_from_npz(
         timestep_stride=5,
         colorful=True,
         color_on=None,
+        marker_size=1,
         follow_taichi_coord=False):
 
     data = dict(np.load(f"{path}/{npz_name}.npz", allow_pickle=True))
@@ -159,10 +160,10 @@ def animation_from_npz(
             if colorful:
                 sampled_value = vel_magnitude[i]
                 trj = ax.scatter(positions[i][:, 0], positions[i][:, 1],
-                                 c=sampled_value, cmap='viridis', vmin=vel_magnitude.min(), vmax=vel_magnitude.mean()+1*vel_magnitude.std(), s=1)
+                                 c=sampled_value, cmap='viridis', vmin=vel_magnitude.min(), vmax=vel_magnitude.mean()+1*vel_magnitude.std(), s=marker_size)
                 fig.colorbar(trj)
             else:
-                ax.scatter(positions[i][:, 0], positions[i][:, 1], s=1)
+                ax.scatter(positions[i][:, 0], positions[i][:, 1], s=marker_size)
             ax.grid(True, which='both')
 
     if ndim == 3:
@@ -192,11 +193,11 @@ def animation_from_npz(
                 ax.invert_zaxis()
                 if colorful:
                     trj = ax.scatter(positions[i][:, 0], positions[i][:, 2], positions[i][:, 1],
-                                     c=sampled_value, vmin=vmin, vmax=vmax, cmap=cmap, s=1)
+                                     c=sampled_value, vmin=vmin, vmax=vmax, cmap=cmap, s=marker_size)
                     fig.colorbar(trj)
                 else:
                     ax.scatter(positions[i][:, 0], positions[i][:, 2], positions[i][:, 1],
-                               s=1)
+                               s=marker_size)
                 ax.set_box_aspect(
                     aspect=(float(boundaries[0][0]) - float(boundaries[0][1]),
                             float(boundaries[2][0]) - float(boundaries[2][1]),
@@ -216,11 +217,11 @@ def animation_from_npz(
                 ax.invert_zaxis()
                 if colorful:
                     trj = ax.scatter(positions[i][:, 0], positions[i][:, 1], positions[i][:, 2],
-                                     c=sampled_value, vmin=vmin, vmax=vmax, cmap=cmap, s=1)
+                                     c=sampled_value, vmin=vmin, vmax=vmax, cmap=cmap, s=marker_size)
                     fig.colorbar(trj)
                 else:
                     ax.scatter(positions[i][:, 0], positions[i][:, 1], positions[i][:, 2],
-                               s=1)
+                               s=marker_size)
                 ax.set_box_aspect(
                     aspect=(float(boundaries[0][0]) - float(boundaries[0][1]),
                             float(boundaries[1][0]) - float(boundaries[1][1]),
