@@ -151,7 +151,7 @@ class MPMSolver:
             # Otherwise the top and right sides will be bounded by grid size
             while self.grid_size <= 2 * max(self.res):
                 self.grid_size *= 2  # keep it power of two
-        offset = tuple(-self.grid_size // 2 for _ in range(self.dim))
+        offset = tuple(int(-self.grid_size // 2) for _ in range(self.dim))
         self.offset = offset
 
         self.num_grids = 2 if self.use_g2p2g else 1
@@ -192,7 +192,7 @@ class MPMSolver:
 
             self.pid.append(pid)
 
-            block_offset = tuple(o // self.leaf_block_size
+            block_offset = tuple(int(o // self.leaf_block_size)
                                  for o in self.offset)
             self.block_offset = block_offset
             block.dynamic(ti.axes(self.dim),
@@ -203,7 +203,8 @@ class MPMSolver:
         self.padding = padding
 
         # Young's modulus and Poisson's ratio
-        self.E, self.nu = input_vars["elastic_modulus"], input_vars["poisson_ratio"]
+        E_scale = inputs["E_scale"] if "E_scale" in inputs else 1.0
+        self.E, self.nu = E_scale * input_vars["elastic_modulus"], input_vars["poisson_ratio"]
         # Lame parameters
         self.mu_0, self.lambda_0 = self.E / (
             2 * (1 + self.nu)), self.E * self.nu / ((1 + self.nu) *
@@ -361,7 +362,7 @@ class MPMSolver:
         """
         ti.loop_config(block_dim=64)
         for p in self.x:
-            base = int(ti.floor(self.x[p] * self.inv_dx - 0.5)) \
+            base = ti.floor(self.x[p] * self.inv_dx - 0.5).cast(ti.i32) \
                    - ti.Vector(self.offset)
             # Pid grandparent is `block`
             base_pid = ti.rescale_index(grid_m, pid.parent(2), base)
@@ -380,7 +381,7 @@ class MPMSolver:
         for I in ti.grouped(pid):
             p = pid[I]
             # G2P
-            base = ti.floor(self.x[p] * self.inv_dx - 0.5).cast(int)
+            base = ti.floor(self.x[p] * self.inv_dx - 0.5).cast(ti.i32)
             Im = ti.rescale_index(pid, grid_m_out, I)
             for D in ti.static(range(self.dim)):
                 base[D] = ti.assume_in_range(base[D], Im[D], 0, 1)
@@ -410,7 +411,7 @@ class MPMSolver:
                 self.x[p] += dt * self.v[p]  # advection
 
             # P2G
-            base = ti.floor(self.x[p] * self.inv_dx - 0.5).cast(int)
+            base = ti.floor(self.x[p] * self.inv_dx - 0.5).cast(ti.i32)
             for D in ti.static(range(self.dim)):
                 base[D] = ti.assume_in_range(base[D], Im[D], -1, 2)
 
@@ -501,7 +502,7 @@ class MPMSolver:
             ti.block_local(self.grid_m)
         for I in ti.grouped(self.pid):
             p = self.pid[I]
-            base = ti.floor(self.x[p] * self.inv_dx - 0.5).cast(int)
+            base = ti.floor(self.x[p] * self.inv_dx - 0.5).cast(ti.i32)
             Im = ti.rescale_index(self.pid, self.grid_m, I)
             for D in ti.static(range(self.dim)):
                 # For block shared memory: hint compiler that there is a connection between `base` and loop index `I`
@@ -525,7 +526,7 @@ class MPMSolver:
                     h = ti.exp(10 * (1.0 - self.Jp[p]))
             if self.material[
                     p] == self.material_elastic:  # jelly, make it softer
-                h = 10.0
+                h = 1.0
             mu, la = self.mu_0 * h, self.lambda_0 * h
             if self.material[p] == self.material_water:  # liquid
                 mu = 0.0
@@ -709,7 +710,7 @@ class MPMSolver:
         ti.no_activate(self.particle)
         for I in ti.grouped(self.pid):
             p = self.pid[I]
-            base = ti.floor(self.x[p] * self.inv_dx - 0.5).cast(int)
+            base = ti.floor(self.x[p] * self.inv_dx - 0.5).cast(ti.i32)
             Im = ti.rescale_index(self.pid, self.grid_m, I)
             for D in ti.static(range(self.dim)):
                 base[D] = ti.assume_in_range(base[D], Im[D], 0, 1)

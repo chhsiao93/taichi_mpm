@@ -41,7 +41,7 @@ def run_collision(i, inputs):
             raise ValueError("`ndim` should be 2 or 3")
 
     # init MPM solver
-    ti.init(arch=ti.cuda, device_memory_GB=3.4)
+    ti.init(arch=ti.cuda, device_memory_GB=15.0)
     mpm = MPMSolver(inputs=inputs, res=sim_resolution, size=domain_size)
 
     if inputs["gen_cube_from_data"]["generate"] == inputs["gen_cube_randomly"]["generate"]:
@@ -70,6 +70,7 @@ def run_collision(i, inputs):
         # Make cubes for mass regarding soft mass
         rand_gen_inputs = inputs["gen_cube_randomly"]["sim_inputs"]
         ncubes = rand_gen_inputs["mass"]["ncubes"]
+        material_type = rand_gen_inputs["mass"]["material_type"] if "material_type" in rand_gen_inputs["mass"] else "SAND"
         min_distance_between_cubes = rand_gen_inputs["mass"]["min_distance_between_cubes"]
         cube_size_range = rand_gen_inputs["mass"]["cube_size_range"]
         vel_range = rand_gen_inputs["mass"]["vel_range"]
@@ -111,6 +112,15 @@ def run_collision(i, inputs):
 
     # TODO: need overlap check between `cubes` and `obstacles`.
 
+    materials_id_map = {
+        'WATER': MPMSolver.material_water,
+        'ELASTIC': MPMSolver.material_elastic,
+        'SNOW': MPMSolver.material_snow,
+        'SAND': MPMSolver.material_sand,
+        'STATIONARY': MPMSolver.material_stationary,
+    }
+    assert material_type in materials_id_map, f"Material type {material_type} not supported, please choose from {list(materials_id_map.keys())}"
+    material_id = materials_id_map[material_type]
     for idx, cube in enumerate(cubes):
         if type(cube) is list or type(cube) is tuple:
             particles_to_add = cube
@@ -124,7 +134,7 @@ def run_collision(i, inputs):
             mpm_solver=mpm,
             ndim=ndim,
             particles_to_add=particles_to_add,
-            material=MPMSolver.material_sand,
+            material=material_id,
             velocity=velocity_for_cubes[idx])
 
     # Make particle type array
@@ -270,7 +280,7 @@ def run_collision(i, inputs):
 
     # Save npz
     np.savez_compressed(f"{save_path}/trajectory{i}", **trajectory)
-    print(f"Trajectory {i} has {positions.shape[1]} particles")
+    print(f"Trajectory {i} has {positions.shape[1]} particles ({material_type} id={material_id})")
     print(f"Output written to: {save_path}/trajectory{i}")
 
     # gen animation and save
@@ -279,7 +289,7 @@ def run_collision(i, inputs):
             utils.animation_from_npz(path=save_path,
                                      npz_name=f"trajectory{i}",
                                      save_name=f"trajectory{i}",
-                                     boundaries=[[0.0,1.0],[0.0,1.0]],#sim_space,
+                                     boundaries=sim_space,#sim_space,
                                      timestep_stride=5,
                                      follow_taichi_coord=follow_taichi_coord)
 
@@ -290,6 +300,7 @@ def run_collision(i, inputs):
         "obstacles": obstacles,
         "nparticles": int(nparticles),
         "friction_angle": inputs["friction_angle"],
+        "E_scale": inputs["E_scale"] if "E_scale" in inputs else 1.0,
         "sim_space": sim_space,
         "dt": mpm_dt,
     }
